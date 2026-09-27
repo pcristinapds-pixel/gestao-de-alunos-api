@@ -11,7 +11,19 @@ describe('POST /api/auth/login', () => {
     sinon.restore();
   });
 
-  testesDeLogin.forEach(testeDeLogin => {
+  testesDeLogin.credenciaisValidas.forEach(testeDeLogin => {
+    it(testeDeLogin.testTitle, async () => {
+      const resposta = await request(app)
+        .post('/api/auth/login')
+        .set('Content-Type', 'application/json')
+        .send(testeDeLogin.dadosLogin);
+
+      expect(resposta.status).to.equal(200);
+      expect(resposta.body).to.have.property('token');
+    });
+  });
+
+  testesDeLogin.credenciaisInvalidas.forEach(testeDeLogin => {
     it(testeDeLogin.testTitle, async () => {
       const resposta = await request(app)
         .post('/api/auth/login')
@@ -19,12 +31,7 @@ describe('POST /api/auth/login', () => {
         .send(testeDeLogin.dadosLogin);
 
       expect(resposta.status).to.equal(testeDeLogin.statusCodeEsperado);
-
-      if (testeDeLogin.statusCodeEsperado === 200) {
-        expect(resposta.body).to.have.property('token');
-      } else {
-        expect(resposta.body.error).to.equal(testeDeLogin.mensagemEsperada);
-      }
+      expect(resposta.body.error).to.equal(testeDeLogin.mensagemEsperada);
     });
   });
 

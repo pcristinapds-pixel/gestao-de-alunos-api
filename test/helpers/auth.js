@@ -1,9 +1,7 @@
-import request from 'supertest';
-import 'dotenv/config'
-import app from '../../src/app.js'
+import { api } from './api.js';
 
 export async function getToken(emailUser, passUser) {
-    const loginResposta = await request(app)
+    const loginResposta = await api()
         .post('/api/auth/login')
         .set('Content-Type', 'application/json')
         .send({
@@ -15,13 +13,5 @@ export async function getToken(emailUser, passUser) {
 }
 
 export async function getTokenAdmin() {
-    const loginResposta = await request(app)
-        .post('/api/auth/login')
-        .set('Content-Type', 'application/json')
-        .send({
-            email: process.env.ADMIN_EMAIL,
-            senha: process.env.ADMIN_SENHA
-        });
-
-    return loginResposta.body.token;
+    return getToken(process.env.ADMIN_EMAIL, process.env.ADMIN_SENHA);
 }

@@ -267,47 +267,52 @@ Os testes da API ficam na pasta `test` e rodam localmente e no GitHub Actions.
 
 ### Ferramentas
 
-Os testes usam Mocha, Chai e Supertest. O Supertest chama o `app` do Express direto, então não precisa subir o servidor com `npm start` para rodar os testes. Também uso o Sinon em um dos testes de login e o Dotenv para ler as variáveis do arquivo `.env`. O banco é o MongoDB, o mesmo usado pela API.
+Os testes usam Mocha, Chai e Supertest. A maioria chama a API pela URL que está em `BASE_URL`, então a API precisa estar rodando. O teste de login chama o `app` do Express direto, porque usa o Sinon para simular um erro dentro da API, e isso só funciona no mesmo processo. Também uso o Faker para gerar dados de aluno e o Dotenv para ler as variáveis do arquivo `.env`. O banco é o MongoDB, o mesmo usado pela API.
 
 ### Organização
 
 ```
 test/
+  alunos.test.js
   auth.test.js
   cadastrar-aluno-entregar-trabalho.test.js
+  factories/
+    alunosFactory.js
   fixtures/
-    login.json
     entrega-trabalhos.json
+    login.json
   helpers/
+    api.js
     auth.js
+    limpeza.js
 ```
 
-Em `helpers/auth.js` ficam as funções de login usadas nos testes. A `getTokenAdmin()` faz login com o admin configurado no `.env` e a `getToken(email, senha)` faz login com o usuário informado. As duas retornam só o token, e o `Bearer` é colocado no header dentro do teste.
+Em `helpers/api.js` fica a função `api()`, que monta o Supertest com a `BASE_URL` do `.env` (ou `http://localhost:3000`, se ela não existir). Em `helpers/auth.js` ficam as funções de login: a `getTokenAdmin()` faz login com o admin configurado no `.env` e a `getToken(email, senha)` faz login com o usuário informado. As duas retornam só o token, e o `Bearer` é colocado no header dentro do teste. Em `helpers/limpeza.js` ficam as funções que apagam, pela própria API, um aluno pelo e-mail e uma disciplina pelo código, se eles existirem.
 
-Os dados dos testes ficam nos arquivos JSON da pasta `fixtures`. Cada teste percorre o JSON com `forEach` e roda o mesmo `it` para cada item, então para incluir um cenário novo é só adicionar um item no arquivo.
+Os dados fixos dos testes ficam nos arquivos JSON da pasta `fixtures`. Cada teste percorre o JSON com `forEach` e roda o mesmo `it` para cada item, então para incluir um cenário novo é só adicionar um item no arquivo. Já a `factories/alunosFactory.js` gera um aluno diferente a cada chamada, com nome do Faker e e-mail e matrícula montados com `Date.now()`.
 
 #### Login (`auth.test.js` e `fixtures/login.json`)
 
-Cenários do JSON:
+O `login.json` tem dois grupos, e cada um tem o seu `forEach` no teste:
 
-- login do admin e de um aluno com dados corretos, esperando 200 e o token na resposta;
-- login sem e-mail e sem senha, esperando 400;
-- senha errada e e-mail não cadastrado, esperando 401.
+- `credenciaisValidas`: login do admin e de um aluno com dados corretos, esperando 200 e o token na resposta;
+- `credenciaisInvalidas`: login sem e-mail e sem senha (400), senha errada e e-mail não cadastrado (401), conferindo também a mensagem que vem no `body.error`.
 
-Nos casos de erro o teste também confere a mensagem que vem no `body.error`.
+Separei assim para o teste não precisar de `if` para decidir o que validar.
 
 Além desses, tem um teste que usa o Sinon para fazer o `login` do `auth.service` lançar um erro e verifica se a API responde 500 com a mensagem `Erro interno do servidor.`. O mock é desfeito no `afterEach` com `sinon.restore()`. Quando esse teste roda aparece "Falha simulada no serviço de login" no terminal, porque o `errorHandler` da API faz um `console.error` do erro.
 
+#### Cadastro de aluno com a factory (`alunos.test.js`)
+
+Cadastra um aluno gerado pela `novoAluno()` e confere o status 201 e se nome, e-mail e matrícula voltaram iguais aos enviados. Como os dados mudam a cada execução, esse teste pode rodar quantas vezes precisar.
+
 #### Cadastro de aluno e entrega de trabalho (`cadastrar-aluno-entregar-trabalho.test.js` e `fixtures/entrega-trabalhos.json`)
 
-Para cada item do JSON o teste faz o fluxo inteiro:
+Antes de tudo, no `before`, o teste apaga os alunos e disciplinas do JSON que já existirem na base, para começar sempre do mesmo estado e não dar 409 quando rodar de novo.
 
-1. login como admin (no `beforeEach`);
-2. cadastro do aluno, conferindo status 201 e se nome, e-mail e matrícula voltaram iguais aos enviados;
-3. cadastro da disciplina (201);
-4. matrícula do aluno na disciplina (201);
-5. login como o aluno que acabou de ser cadastrado;
-6. entrega do trabalho, conferindo o status esperado e se o trabalho retornado tem o aluno, a disciplina, o título e a descrição certos, com status `entregue`.
+Depois, para cada item do JSON, o teste faz o fluxo inteiro: login como admin (no `beforeEach`), cadastro do aluno, cadastro da disciplina, matrícula do aluno na disciplina, login como o aluno e entrega do trabalho.
+
+A validação fica no objetivo do teste, que é a entrega: o status esperado e se o trabalho retornado tem o aluno, a disciplina, o título e a descrição certos, com status `entregue`. Se alguma etapa anterior falhar, a entrega também falha.
 
 ### Rodando localmente
 
@@ -319,19 +324,24 @@ Instale as dependências:
 npm ci
 ```
 
-Crie um arquivo `.env` na raiz, usando o `.env.exemple` como base. Para não misturar com os dados de desenvolvimento, use uma base só para os testes:
+Crie um arquivo `.env` na raiz, usando o `.env.example` como base:
 
 ```env
-MONGODB_URI=mongodb://127.0.0.1:27017/gestao-de-alunos-test
+BASE_URL=http://localhost:3000
 ADMIN_EMAIL=admin@escola.com
 ADMIN_SENHA=admin123
+MONGODB_URI=mongodb://127.0.0.1:27017/gestao-de-alunos-test
 ```
 
 O admin tem que ser o do seed da API (`admin@escola.com` / `admin123`), já que não existe rota para cadastrar outro administrador.
 
-Os arquivos de teste importam o `dotenv/config` na primeira linha, antes do `app`, para a conexão com o MongoDB já pegar o `MONGODB_URI` do `.env`.
+Em um terminal, suba a API usando a base de testes:
 
-Depois é só rodar:
+```bash
+MONGODB_URI=mongodb://127.0.0.1:27017/gestao-de-alunos-test npm start
+```
+
+Em outro terminal, rode os testes:
 
 ```bash
 npm test
@@ -341,27 +351,23 @@ Ou um arquivo só:
 
 ```bash
 npx mocha test/auth.test.js --exit
+npx mocha test/alunos.test.js --exit
 npx mocha test/cadastrar-aluno-entregar-trabalho.test.js --exit
 ```
 
-Os dados do `entrega-trabalhos.json` são fixos, então se rodar os testes duas vezes na mesma base o cadastro do aluno vai dar 409 (já existe). Nesse caso, limpe a base de testes antes:
-
-```bash
-mongosh mongodb://127.0.0.1:27017/gestao-de-alunos-test --eval "db.dropDatabase()"
-```
-
-Na próxima execução o seed cria de novo o admin e os dados iniciais.
+Como o teste do fluxo apaga os próprios dados no `before`, dá para rodar `npm test` quantas vezes precisar sem limpar a base à mão.
 
 ### GitHub Actions
 
-O workflow fica em `.github/workflows/tests.yml` e roda em push nas branches `main` e `trabalho-api` e em pull request para a `main`.
+O workflow fica em `.github/workflows/tests.yml` e roda em push nas branches `main` e `trabalho-api`, em pull request para a `main` e também manualmente, pelo botão "Run workflow".
 
-Ele faz o checkout, configura o Node 20, sobe um MongoDB 7 como serviço, instala as dependências com `npm ci` e roda `npm test`. Como o MongoDB é criado do zero a cada execução, os dados fixos dos testes não dão conflito na pipeline.
+Ele faz o checkout, configura o Node 20, sobe um MongoDB 7 como serviço, instala as dependências com `npm ci`, inicia a API em segundo plano, espera 10 segundos para ela subir e roda `npm test`. Como o MongoDB é criado do zero a cada execução, os dados fixos dos testes não dão conflito na pipeline.
 
-O e-mail e a senha do admin não ficam no arquivo do workflow. Eles precisam estar cadastrados no repositório em Settings > Secrets and variables > Actions, com os nomes `ADMIN_EMAIL` e `ADMIN_SENHA`. O workflow passa esses valores para o passo dos testes assim:
+O e-mail e a senha do admin não ficam no arquivo do workflow. Eles precisam estar cadastrados no repositório em Settings > Secrets and variables > Actions, com os nomes `ADMIN_EMAIL` e `ADMIN_SENHA`. O workflow passa esses valores para todos os passos do job pelo bloco `env`:
 
 ```yaml
 env:
+  BASE_URL: http://localhost:3000
   MONGODB_URI: mongodb://127.0.0.1:27017/gestao-de-alunos-test
   ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
   ADMIN_SENHA: ${{ secrets.ADMIN_SENHA }}
