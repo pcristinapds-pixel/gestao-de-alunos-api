@@ -80,7 +80,7 @@ docs/
 
 Pré-requisitos:
 
-- Node.js 18+ (usa `crypto.randomUUID`, disponível nativamente).
+- Node.js 20.19+ (versão mínima exigida pelo Mongoose utilizado no projeto).
 - Uma instância do **MongoDB** acessível (local ou remota).
 
 ```bash
@@ -260,3 +260,111 @@ curl -X POST http://localhost:3000/api/alunos/aluno-ana-souza/trabalhos \
 
 > Novos registros criados via API recebem ids no formato UUID (gerados com
 > `crypto.randomUUID()`), diferente dos ids legíveis usados nos dados fake acima.
+
+## Testes automatizados
+
+Os testes da API ficam na pasta `test` e rodam localmente e no GitHub Actions.
+
+### Ferramentas
+
+Os testes usam Mocha, Chai e Supertest. O Supertest chama o `app` do Express direto, então não precisa subir o servidor com `npm start` para rodar os testes. Também uso o Sinon em um dos testes de login e o Dotenv para ler as variáveis do arquivo `.env`. O banco é o MongoDB, o mesmo usado pela API.
+
+### Organização
+
+```
+test/
+  auth.test.js
+  cadastrar-aluno-entregar-trabalho.test.js
+  fixtures/
+    login.json
+    entrega-trabalhos.json
+  helpers/
+    auth.js
+```
+
+Em `helpers/auth.js` ficam as funções de login usadas nos testes. A `getTokenAdmin()` faz login com o admin configurado no `.env` e a `getToken(email, senha)` faz login com o usuário informado. As duas retornam só o token, e o `Bearer` é colocado no header dentro do teste.
+
+Os dados dos testes ficam nos arquivos JSON da pasta `fixtures`. Cada teste percorre o JSON com `forEach` e roda o mesmo `it` para cada item, então para incluir um cenário novo é só adicionar um item no arquivo.
+
+#### Login (`auth.test.js` e `fixtures/login.json`)
+
+Cenários do JSON:
+
+- login do admin e de um aluno com dados corretos, esperando 200 e o token na resposta;
+- login sem e-mail e sem senha, esperando 400;
+- senha errada e e-mail não cadastrado, esperando 401.
+
+Nos casos de erro o teste também confere a mensagem que vem no `body.error`.
+
+Além desses, tem um teste que usa o Sinon para fazer o `login` do `auth.service` lançar um erro e verifica se a API responde 500 com a mensagem `Erro interno do servidor.`. O mock é desfeito no `afterEach` com `sinon.restore()`. Quando esse teste roda aparece "Falha simulada no serviço de login" no terminal, porque o `errorHandler` da API faz um `console.error` do erro.
+
+#### Cadastro de aluno e entrega de trabalho (`cadastrar-aluno-entregar-trabalho.test.js` e `fixtures/entrega-trabalhos.json`)
+
+Para cada item do JSON o teste faz o fluxo inteiro:
+
+1. login como admin (no `beforeEach`);
+2. cadastro do aluno, conferindo status 201 e se nome, e-mail e matrícula voltaram iguais aos enviados;
+3. cadastro da disciplina (201);
+4. matrícula do aluno na disciplina (201);
+5. login como o aluno que acabou de ser cadastrado;
+6. entrega do trabalho, conferindo o status esperado e se o trabalho retornado tem o aluno, a disciplina, o título e a descrição certos, com status `entregue`.
+
+### Rodando localmente
+
+Precisa do Node.js 20.19 ou superior (por causa da versão do Mongoose) e de um MongoDB rodando.
+
+Instale as dependências:
+
+```bash
+npm ci
+```
+
+Crie um arquivo `.env` na raiz, usando o `.env.exemple` como base. Para não misturar com os dados de desenvolvimento, use uma base só para os testes:
+
+```env
+MONGODB_URI=mongodb://127.0.0.1:27017/gestao-de-alunos-test
+ADMIN_EMAIL=admin@escola.com
+ADMIN_SENHA=admin123
+```
+
+O admin tem que ser o do seed da API (`admin@escola.com` / `admin123`), já que não existe rota para cadastrar outro administrador.
+
+Os arquivos de teste importam o `dotenv/config` na primeira linha, antes do `app`, para a conexão com o MongoDB já pegar o `MONGODB_URI` do `.env`.
+
+Depois é só rodar:
+
+```bash
+npm test
+```
+
+Ou um arquivo só:
+
+```bash
+npx mocha test/auth.test.js --exit
+npx mocha test/cadastrar-aluno-entregar-trabalho.test.js --exit
+```
+
+Os dados do `entrega-trabalhos.json` são fixos, então se rodar os testes duas vezes na mesma base o cadastro do aluno vai dar 409 (já existe). Nesse caso, limpe a base de testes antes:
+
+```bash
+mongosh mongodb://127.0.0.1:27017/gestao-de-alunos-test --eval "db.dropDatabase()"
+```
+
+Na próxima execução o seed cria de novo o admin e os dados iniciais.
+
+### GitHub Actions
+
+O workflow fica em `.github/workflows/tests.yml` e roda em push nas branches `main` e `trabalho-api` e em pull request para a `main`.
+
+Ele faz o checkout, configura o Node 20, sobe um MongoDB 7 como serviço, instala as dependências com `npm ci` e roda `npm test`. Como o MongoDB é criado do zero a cada execução, os dados fixos dos testes não dão conflito na pipeline.
+
+O e-mail e a senha do admin não ficam no arquivo do workflow. Eles precisam estar cadastrados no repositório em Settings > Secrets and variables > Actions, com os nomes `ADMIN_EMAIL` e `ADMIN_SENHA`. O workflow passa esses valores para o passo dos testes assim:
+
+```yaml
+env:
+  MONGODB_URI: mongodb://127.0.0.1:27017/gestao-de-alunos-test
+  ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+  ADMIN_SENHA: ${{ secrets.ADMIN_SENHA }}
+```
+
+Se algum teste falhar, o job fica vermelho.

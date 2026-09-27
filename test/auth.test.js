@@ -29,7 +29,7 @@ describe('POST /api/auth/login', () => {
   });
 
   it('deve retornar 500 quando ocorrer um erro inesperado no serviço de login', async () => {
-    sinon.stub(authService, 'login').throws(new Error('Erro catastrófico'));
+    sinon.stub(authService, 'login').throws(new Error('Falha simulada no serviço de login'));
 
     const resposta = await request(app)
       .post('/api/auth/login')
