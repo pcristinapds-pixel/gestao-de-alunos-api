@@ -1,8 +1,9 @@
 name: Testes de API
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, trabalho-api]
   pull_request:
     branches: [main]
 
