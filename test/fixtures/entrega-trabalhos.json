@@ -1,0 +1,42 @@
+[
+    {
+        "testTitle": "deve conseguir cadastrar um aluno, logar como aluno e registrar a entrega de um trabalho como aluno",
+        "dadosAluno": {
+            "nome": "Daniela Teste9",
+            "email": "daniela.teste9@example.com",
+            "matricula": "TST0109",
+            "senha": "123456"
+        },
+        "dadosDisciplina": {
+            "nome": "Lógica da Programação II",
+            "codigo": "LP00051",
+            "cargaHoraria": 200
+        },
+        "dadosTrabalho": {
+            "disciplinaId": "",
+            "titulo": "Lista de Exercícios 2",
+            "descricao": "Resolução dos exercícios de 21 a 40 do capítulo 2."
+        },
+        "statusCodeEsperado": 201
+    },
+    {
+        "testTitle": "deve conseguir cadastrar um aluno, logar como aluno e registrar a entrega de um trabalho como aluno",
+        "dadosAluno": {
+            "nome": "Daniela Teste10",
+            "email": "daniela.teste10@example.com",
+            "matricula": "TST01010",
+            "senha": "123456"
+        },
+        "dadosDisciplina": {
+            "nome": "Lógica da Programação III",
+            "codigo": "LP00050",
+            "cargaHoraria": 250
+        },
+        "dadosTrabalho": {
+            "disciplinaId": "",
+            "titulo": "Lista de Exercícios 4",
+            "descricao": "Resolução dos exercícios de 21 a 40 do capítulo 2."
+        },
+        "statusCodeEsperado": 201
+    }
+]

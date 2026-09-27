@@ -1,0 +1,54 @@
+[
+    {
+        "testTitle": "deve retornar 200 e um token quando o admin informar e-mail e senha corretos",
+        "dadosLogin": {
+            "email": "admin@escola.com",
+            "senha": "admin123"
+        },
+        "statusCodeEsperado": 200
+    },
+    {
+        "testTitle": "deve retornar 200 e um token quando o aluno informar e-mail e senha corretos",
+        "dadosLogin": {
+            "email": "ana.souza@example.com",
+            "senha": "123456"
+        },
+        "statusCodeEsperado": 200
+    },
+    {
+        "testTitle": "deve retornar 400 quando o e-mail não for informado",
+        "dadosLogin": {
+            "email": "",
+            "senha": "admin123"
+        },
+        "statusCodeEsperado": 400,
+        "mensagemEsperada": "Os campos \"email\" e \"senha\" são obrigatórios."
+    },
+    {
+        "testTitle": "deve retornar 400 quando a senha não for informada",
+        "dadosLogin": {
+            "email": "admin@escola.com",
+            "senha": ""
+        },
+        "statusCodeEsperado": 400,
+        "mensagemEsperada": "Os campos \"email\" e \"senha\" são obrigatórios."
+    },
+    {
+        "testTitle": "deve retornar 401 quando a senha informada for inválida",
+        "dadosLogin": {
+            "email": "admin@escola.com",
+            "senha": "senha-incorreta"
+        },
+        "statusCodeEsperado": 401,
+        "mensagemEsperada": "E-mail ou senha inválidos."
+    },
+    {
+        "testTitle": "deve retornar 401 quando o e-mail não estiver cadastrado",
+        "dadosLogin": {
+            "email": "nao.cadastrado@escola.com",
+            "senha": "admin123"
+        },
+        "statusCodeEsperado": 401,
+        "mensagemEsperada": "E-mail ou senha inválidos."
+    }
+]
